@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>CRT Screen</title>
+    <style>
+      body {
+        background-color: #000;
+        color: #aaa;
+        font-family: "Courier New", Courier, monospace;
+        margin: 0;
+        padding: 20px;
+        overflow: hidden;
+        font-size: 18px;
+        line-height: 1.4;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        box-sizing: border-box;
+      }
+      .terminal-output {
+        flex-grow: 1;
+        white-space: pre-wrap;
+        word-break: break-all;
+        overflow-y: auto;
+        max-height: calc(100% - 2em);
+        margin-bottom: 0.5em;
+      }
+      .prompt-container {
+        display: flex;
+        align-items: center;
+        margin-top: auto;
+        margin-bottom: 0;
+      }
+      .prompt-label {
+        color: #0f0;
+        margin-right: 10px;
+        white-space: nowrap;
+      }
+      .command-input {
+        flex-grow: 1;
+        background: none;
+        border: none;
+        color: #aaa;
+        font-family: inherit;
+        font-size: inherit;
+        outline: none;
+        caret-color: #aaa;
+      }
+      .cursor {
+        display: inline-block;
+        width: 10px;
+        height: 18px;
+        background-color: #aaa;
+        animation: blink 1s infinite;
+        vertical-align: middle;
+        margin-left: 2px;
+      }
+      @keyframes blink {
+        0%, 49% { opacity: 1; }
+        50%, 100% { opacity: 0; }
+      }
+      .hidden { display: none; }
+
+      .graphical-interface {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        width: 100%;
+        background-color: #1a1a1a;
+        color: #00ff00;
+        font-family: 'Press Start 2P', cursive;
+        padding: 20px;
+        box-sizing: border-box;
+        overflow: auto;
+      }
+      .graphical-interface h1 {
+        color: #ffff00;
+        text-align: center;
+        margin-bottom: 20px;
+        font-size: 2.5em;
+        text-shadow: 0 0 5px #ffff00;
+      }
+      .project-list {
+        list-style: none;
+        padding: 0;
+        margin: 0 auto;
+        max-width: 600px;
+        text-align: center;
+      }
+      .project-list li {
+        margin-bottom: 15px;
+        cursor: pointer;
+        transition: color 0.2s ease-in-out, text-shadow 0.2s ease-in-out;
+        font-size: 1.2em;
+        padding: 5px;
+        border: 1px solid transparent;
+        border-radius: 4px;
+      }
+      .project-list li:hover {
+        color: #ffff00;
+        text-shadow: 0 0 8px #ffff00;
+        border-color: #ffff00;
+      }
+      .back-button {
+        position: absolute;
+        bottom: 20px;
+        left: 20px;
+        color: #ff0000;
+        cursor: pointer;
+        font-size: 1.1em;
+        border: 1px solid #ff0000;
+        padding: 5px 10px;
+        border-radius: 4px;
+      }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div class="terminal-output" id="terminal-output"></div>
+    <div class="prompt-container">
+      <span class="prompt-label">C:\&gt;</span>
+      <input type="text" id="command-input" class="command-input" autofocus>
+      <span class="cursor"></span>
+    </div>
+
+    <script>
+      const terminalOutput = document.getElementById('terminal-output');
+      const commandInput = document.getElementById('command-input');
+      const cursor = document.querySelector('.cursor');
+      const promptContainer = document.querySelector('.prompt-container');
+      let currentCommand = '';
+      let isGuiMode = false;
+      let currentProjectIframe = null;
+
+      function focusInput() {
+        if (!isGuiMode) commandInput.focus();
+      }
+      document.body.addEventListener('click', focusInput);
+      focusInput();
+
+      function addOutput(text, isCommandEcho = false) {
+        const outputLine = document.createElement('div');
+        if (isCommandEcho) {
+          outputLine.innerHTML = `<span class="prompt-label">C:\\&gt;</span> ${text.replace(/</g, '&lt;').replace(/>/g, '&gt;')}`;
+        } else {
+          outputLine.textContent = text;
+        }
+        terminalOutput.appendChild(outputLine);
+        terminalOutput.scrollTop = terminalOutput.scrollHeight;
+      }
+
+      function processCommand(command) {
+        command = command.trim().toLowerCase();
+        if (command.length === 0) return;
+        addOutput(command, true);
+
+        if (command === 'help') {
+          addOutput("Available commands:\n  help - Show help\n  dir - List projects\n  run <proj> - Run project (e.g., run work_1)\n  clear - Clear\n  gui - Graphical Menu\n  credits - Show credits");
+        } else if (command === 'dir') {
+          addOutput("Directory of C:\\P5JS_WORKS\n\n  WORK_1\n  WORK_2\n  WORK_3\n  WORK_5\n  WORK_6\n  WORK_7\n  WORK_8");
+        } else if (command === 'credits') {
+          addOutput("Project: read_only\nConcept & Build: Alexander Kim\nSpecial thanks: Computer Graphics Class\n2026");
+        } else if (command === 'clear' || command === 'cls') {
+          terminalOutput.innerHTML = '';
+        } else if (command === 'gui') {
+          switchToGraphicalInterface();
+        } else if (command.startsWith('run ')) {
+          loadProject(command.substring(4));
+        } else {
+          addOutput(`Bad command: ${command}`);
+        }
+      }
+
+      function switchToGraphicalInterface() {
+        isGuiMode = true;
+        promptContainer.classList.add('hidden');
+        terminalOutput.innerHTML = '';
+        const guiDiv = document.createElement('div');
+        guiDiv.className = 'graphical-interface';
+        guiDiv.id = 'graphical-interface';
+        guiDiv.innerHTML = `
+          <h1>CG Portfolio Works</h1>
+          <ul class="project-list">
+            <li data-project="work_1">Work 1</li>
+            <li data-project="work_2">Work 2</li>
+            <li data-project="work_3">Work 3</li>
+            <li data-project="work_5">Work 5</li>
+            <li data-project="work_6">Work 6</li>
+            <li data-project="work_7">Work 7</li>
+            <li data-project="work_8">Work 8</li>
+          </ul>
+          <div class="back-button" onclick="returnToTerminal()">EXIT</div>
+        `;
+        terminalOutput.parentNode.appendChild(guiDiv);
+        guiDiv.querySelectorAll('.project-list li').forEach(li => {
+          li.addEventListener('click', () => loadProject(li.getAttribute('data-project')));
+        });
+      }
+
+      function loadProject(projectName) {
+        const guiDiv = document.getElementById('graphical-interface');
+        if (guiDiv) guiDiv.style.display = 'none';
+        promptContainer.classList.add('hidden');
+        terminalOutput.innerHTML = '';
+
+        currentProjectIframe = document.createElement('iframe');
+        currentProjectIframe.id = 'project-iframe';
+        currentProjectIframe.style.width = '100%';
+        currentProjectIframe.style.height = '100%';
+        currentProjectIframe.style.border = 'none';
+        currentProjectIframe.style.pointerEvents = 'auto';
+        currentProjectIframe.style.backgroundColor = '#000';
+
+        console.log("Loading project:", projectName);
+        console.log(`p5js_works/${projectName}/index.html`);
+
+        currentProjectIframe.src = `./p5js_works/${projectName}/`;
+
+        currentProjectIframe.onload = () => {
+            const doc = currentProjectIframe.contentDocument || currentProjectIframe.contentWindow.document;
+            const style = doc.createElement('style');
+            style.textContent = `
+                canvas {
+                    max-width: 100% !important;
+                    max-height: 100% !important;
+                    object-fit: contain !important;
+                    width: auto !important;
+                    height: auto !important;
+                }
+                body {
+                    display: flex !important;
+                    justify-content: center !important;
+                    align-items: center !important;
+                    height: 100vh !important;
+                    margin: 0 !important;
+                    background-color: #000 !important;
+                }
+            `;
+            doc.head.appendChild(style);
+            showExitInstruction();
+        };
+
+        terminalOutput.parentNode.appendChild(currentProjectIframe);
+      }
+
+      function showExitInstruction() {
+          const exitInstructionDiv = document.createElement('div');
+          exitInstructionDiv.textContent = 'Press ESC to return to terminal';
+          exitInstructionDiv.className = 'back-button';
+          exitInstructionDiv.style.position = 'absolute';
+          exitInstructionDiv.style.bottom = '20px';
+          exitInstructionDiv.style.left = '20px';
+          exitInstructionDiv.style.color = '#ff0000';
+          exitInstructionDiv.style.cursor = 'pointer';
+          exitInstructionDiv.style.fontSize = '1.1em';
+          exitInstructionDiv.style.border = '1px solid #ff0000';
+          exitInstructionDiv.style.padding = '5px 10px';
+          exitInstructionDiv.style.borderRadius = '4px';
+          exitInstructionDiv.style.zIndex = '1000';
+          exitInstructionDiv.style.fontFamily = '\"Courier New\", Courier, monospace';
+          exitInstructionDiv.addEventListener('click', returnToTerminal);
+          document.body.appendChild(exitInstructionDiv);
+      }
+
+      function returnToTerminal() {
+        if (currentProjectIframe) {
+          currentProjectIframe.remove();
+          currentProjectIframe = null;
+        }
+        // Remove exit instruction
+        const exitInstruction = document.querySelector('.back-button[style*="position: absolute"]');
+        if (exitInstruction) {
+            exitInstruction.remove();
+        }
+
+        const guiDiv = document.getElementById('graphical-interface');
+        if (guiDiv) guiDiv.remove();
+        
+        terminalOutput.innerHTML = 'Computer Graphics Personal Computer Basic\nVersion C1.10 Copyright C.G. Corp 2026\nA&T Department Division\n62940 Bytes free\nOk\n\nThis is a simple text-based interface for my p5js projects showcase. You can start by typing command like "help".\n';
+        promptContainer.classList.remove('hidden');
+        commandInput.disabled = false;
+        isGuiMode = false;
+        focusInput();
+      }
+
+      commandInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          processCommand(commandInput.value);
+          commandInput.value = '';
+        }
+      });
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') returnToTerminal();
+      });
+
+      addOutput('Computer Graphics Personal Computer Basic\nVersion C1.10 Copyright C.G. Corp 2026\nA&T Department Division\n62940 Bytes free\nOk\n\nThis is a simple text-based interface for my p5js projects showcase. You can start by typing "help"\n');
+      
+      window.addEventListener('wheel', (e) => {
+        window.parent.postMessage({ type: 'camera-zoom', deltaY: e.deltaY }, '*');
+      });
+
+      // <!-- opencode test -->
+    </script>
+  </body>
+</html>
