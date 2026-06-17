@@ -1,3 +1,32 @@
+// 0. Ambient computer hum (loops, low volume, starts at scene start)
+const humAudio = new Audio('assets/671944__arch418__serv5.wav');
+humAudio.loop = true;
+humAudio.volume = 0.12;
+// Try to start immediately; if the browser blocks autoplay-with-sound,
+// fall back to starting on the first user interaction.
+humAudio.play().catch(() => {
+  const startHum = () => {
+    humAudio.play().catch(() => {});
+    window.removeEventListener('pointerdown', startHum);
+    window.removeEventListener('keydown', startHum);
+    window.removeEventListener('wheel', startHum);
+  };
+  window.addEventListener('pointerdown', startHum);
+  window.addEventListener('keydown', startHum);
+  window.addEventListener('wheel', startHum);
+});
+
+// 0b. UI interaction sound (plays on every click / keypress in the 3D view)
+const clickSound = new Audio('assets/367852__jofae__button-pressed.mp3');
+clickSound.volume = 0.35;
+function playClick() {
+  // Reset so rapid interactions retrigger instead of being ignored
+  clickSound.currentTime = 0;
+  clickSound.play().catch(() => {});
+}
+window.addEventListener('pointerdown', playClick);
+window.addEventListener('keydown', playClick);
+
 // 1. Scene, Camera, and Renderer Setup
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x050508);
@@ -200,7 +229,85 @@ function onWindowResize() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   // Also resize the CSS3DRenderer
   cssRenderer.setSize(window.innerWidth, window.innerHeight);
+  // Keep PS1 composer + shader resolution in sync
+  if (typeof composer !== 'undefined') {
+    composer.setSize(window.innerWidth, window.innerHeight);
+    ps1Pass.uniforms.resolution.value.set(window.innerWidth, window.innerHeight);
+  }
 }
+
+// ============================================================
+// PS1 POST-PROCESSING (lite) — fully self-contained.
+// To revert: set PS1_POST = false, or delete this block and the
+// composer branch in animate() + the postprocessing scripts in index.html.
+// Press "P" at runtime to toggle on/off live.
+// ============================================================
+let PS1_POST = true;
+
+// Cheap classic-PS1 trio: low-res pixel snap + color banding + ordered dither.
+const PS1Shader = {
+  uniforms: {
+    tDiffuse: { value: null },
+    resolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+    pixelSize: { value: 3.0 },   // chunky pixels (downsample factor)
+    colorDepth: { value: 32.0 }  // levels per channel (~5-bit)
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform vec2 resolution;
+    uniform float pixelSize;
+    uniform float colorDepth;
+    varying vec2 vUv;
+
+    // 4x4 ordered Bayer dither matrix
+    float bayer(vec2 p) {
+      int x = int(mod(p.x, 4.0));
+      int y = int(mod(p.y, 4.0));
+      int i = x + y * 4;
+      float m[16];
+      m[0]=0.0;  m[1]=8.0;  m[2]=2.0;  m[3]=10.0;
+      m[4]=12.0; m[5]=4.0;  m[6]=14.0; m[7]=6.0;
+      m[8]=3.0;  m[9]=11.0; m[10]=1.0; m[11]=9.0;
+      m[12]=15.0;m[13]=7.0; m[14]=13.0;m[15]=5.0;
+      float v = 0.0;
+      for (int k = 0; k < 16; k++) { if (k == i) v = m[k]; }
+      return v / 16.0 - 0.5;
+    }
+
+    void main() {
+      // Pixel snap (low-res look)
+      vec2 grid = resolution / pixelSize;
+      vec2 uv = floor(vUv * grid) / grid;
+      vec4 color = texture2D(tDiffuse, uv);
+
+      // Ordered dither + color quantization (banding)
+      float d = bayer(gl_FragCoord.xy / pixelSize) / colorDepth;
+      color.rgb = floor(color.rgb * colorDepth + 0.5 + d) / colorDepth;
+
+      gl_FragColor = color;
+    }
+  `
+};
+
+const composer = new THREE.EffectComposer(renderer);
+composer.addPass(new THREE.RenderPass(scene, camera));
+const ps1Pass = new THREE.ShaderPass(PS1Shader);
+ps1Pass.renderToScreen = true;
+composer.addPass(ps1Pass);
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'p' || e.key === 'P') {
+    PS1_POST = !PS1_POST;
+    console.log('PS1 post-processing:', PS1_POST ? 'ON' : 'OFF');
+  }
+});
 
 // 5. Render Loop
 function animate() {
@@ -212,8 +319,13 @@ function animate() {
   camera.position.y = 0.75 + Math.cos(time * 0.3) * 0.01;
   camera.lookAt(0, 0.65, -0.07);
 
-  // Render both scenes
-  renderer.render(scene, camera);
+  // Render the 3D scene (with or without PS1 post)
+  if (PS1_POST) {
+    composer.render();
+  } else {
+    renderer.render(scene, camera);
+  }
+  // CSS3D screen always renders on top, unaffected by post-processing
   cssRenderer.render(scene, camera);
 }
 

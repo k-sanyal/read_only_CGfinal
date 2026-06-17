@@ -125,6 +125,16 @@
     </div>
 
     <script>
+      // UI interaction sound (plays on every keypress / click in the terminal)
+      const clickSound = new Audio('assets/367852__jofae__button-pressed.mp3');
+      clickSound.volume = 0.35;
+      function playClick() {
+        clickSound.currentTime = 0;
+        clickSound.play().catch(() => {});
+      }
+      document.addEventListener('keydown', playClick);
+      document.addEventListener('pointerdown', playClick);
+
       const terminalOutput = document.getElementById('terminal-output');
       const commandInput = document.getElementById('command-input');
       const cursor = document.querySelector('.cursor');

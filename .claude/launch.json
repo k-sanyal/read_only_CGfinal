@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "read_only",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", ".", "-l", "3000"],
+      "port": 3000
+    }
+  ]
+}
