@@ -31,4 +31,5 @@ PROBLEMS EXIST AT THE MOMENT:
 
 FURTHER:
 - add more props
-- credits command
+- sound of start-up
+- start-up sequence
